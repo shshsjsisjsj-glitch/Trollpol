@@ -79,6 +79,14 @@ jobs:
           find $GITHUB_WORKSPACE/Trollpol -type f -name "*.mk" -exec sed -i '' '/generate-pch/d' {} +
           echo "✅ All generate-pch references removed."
 
+      - name: Add Swift flags to disable PCH
+        run: |
+          echo "⚙️ Adding .swift-build-flags to disable PCH..."
+          mkdir -p $GITHUB_WORKSPACE/Trollpol/supports
+          echo "-Xfrontend -disable-pch-validation -disable-implicit-pch-validation" > $GITHUB_WORKSPACE/Trollpol/supports/.swift-build-flags
+          cat $GITHUB_WORKSPACE/Trollpol/supports/.swift-build-flags
+          echo "✅ Swift PCH disabled via build flags."
+
       - name: Build Trollpol (.tipa)
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
