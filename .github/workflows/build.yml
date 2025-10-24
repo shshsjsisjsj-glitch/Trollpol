@@ -24,8 +24,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install ldid dpkg zip plutil
-          echo "✅ Installed ldid, dpkg, zip, and plutil"
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install ldid dpkg zip
+          echo "✅ Installed ldid, dpkg, and zip"
 
       - name: Checkout TrollSpeed project
         uses: actions/checkout@v4
@@ -46,13 +46,13 @@ jobs:
           echo "VERSION=${VERSION_TAG}" >> $GITHUB_ENV
           echo "📦 Version: ${VERSION_TAG}"
 
-      - name: Run gen-control.sh (generate control)
+      - name: Run gen-control.sh (generate DEB control)
         run: |
           cd TrollSpeed
           if [ -f "gen-control.sh" ]; then
             echo "🧩 Generating DEB control file..."
             ./gen-control.sh ${{ env.VERSION }}
-            echo "✅ gen-control.sh done."
+            echo "✅ gen-control.sh completed."
           else
             echo "⚠️ No gen-control.sh found, skipping DEB control."
           fi
@@ -76,7 +76,7 @@ jobs:
             dpkg-deb -b layout packages/TrollSpeed_${{ env.VERSION }}_arm64.deb
             echo "✅ Debian package created."
           else
-            echo "⚠️ No DEBIAN layout found, skipping .deb package."
+            echo "⚠️ No DEBIAN layout found, skipping .deb packaging."
           fi
 
       - name: Upload build artifacts
@@ -92,8 +92,33 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: "Build completed at ${{ github.run_id }}"
+          body: "🚀 TrollSpeed build completed automatically!"
           generate_release_notes: true
           files: |
             ${{ github.workspace }}/TrollSpeed/packages/*.tipa
             ${{ github.workspace }}/TrollSpeed/packages/*.deb
+
+      - name: Show build summary
+        if: always()
+        run: |
+          echo "🧩 Checking build output..."
+          cd $GITHUB_WORKSPACE/TrollSpeed/packages || exit 0
+
+          echo "----------------------------------------"
+          echo "📦 Build Summary"
+          echo "----------------------------------------"
+          if ls *.tipa >/dev/null 2>&1; then
+            echo "✅ TrollStore build (.tipa) found:"
+            ls -lh *.tipa
+          else
+            echo "⚠️ No .tipa file found."
+          fi
+
+          if ls *.deb >/dev/null 2>&1; then
+            echo "✅ Jailbreak build (.deb) found:"
+            ls -lh *.deb
+          else
+            echo "⚠️ No .deb package found."
+          fi
+          echo "----------------------------------------"
+          echo "🎯 Build completed at $(date)"
