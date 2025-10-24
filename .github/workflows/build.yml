@@ -1,4 +1,4 @@
-name: Build TrollSpeed (.tipa)
+name: Build TrollSpeed (.tipa / .deb)
 
 on:
   push:
@@ -24,52 +24,76 @@ jobs:
 
       - name: Install dependencies
         run: |
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install ldid zip
-          echo "✅ Installed ldid and zip"
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install ldid dpkg zip plutil
+          echo "✅ Installed ldid, dpkg, zip, and plutil"
 
       - name: Checkout TrollSpeed project
         uses: actions/checkout@v4
         with:
-          repository: shshsjsisjsj-glitch/Trollpol
-          ref: main
           path: TrollSpeed
           submodules: recursive
 
-      - name: Make build.sh executable
+      - name: Make scripts executable
         run: |
-          cd $GITHUB_WORKSPACE/TrollSpeed
-          chmod +x build.sh
+          cd TrollSpeed
+          chmod +x build.sh || true
+          chmod +x gen-control.sh || true
 
-      - name: Build TrollSpeed (.tipa)
+      - name: Get version info
+        id: version
         run: |
-          cd $GITHUB_WORKSPACE/TrollSpeed
           VERSION_TAG=$(git describe --tags --always || echo "v1.0.0")
-          echo "🚀 Building TrollSpeed version ${VERSION_TAG}"
-          ./build.sh ${VERSION_TAG}
-          echo "✅ TrollSpeed build finished."
+          echo "VERSION=${VERSION_TAG}" >> $GITHUB_ENV
+          echo "📦 Version: ${VERSION_TAG}"
 
-      - name: Rename .tipa artifact
+      - name: Run gen-control.sh (generate control)
         run: |
-          cd $GITHUB_WORKSPACE/TrollSpeed/packages
-          FILE=$(ls *.tipa | head -n 1)
-          BUILDNUM=${{ github.run_number }}
-          NEWNAME="TrollSpeed_${FILE%.*}_build${BUILDNUM}.tipa"
-          mv "$FILE" "$NEWNAME"
-          echo "RENAMED_FILE=$NEWNAME" >> $GITHUB_ENV
-          echo "📦 Renamed artifact to $NEWNAME"
+          cd TrollSpeed
+          if [ -f "gen-control.sh" ]; then
+            echo "🧩 Generating DEB control file..."
+            ./gen-control.sh ${{ env.VERSION }}
+            echo "✅ gen-control.sh done."
+          else
+            echo "⚠️ No gen-control.sh found, skipping DEB control."
+          fi
 
-      - name: Upload TrollSpeed artifact
+      - name: Run build.sh (build .tipa)
+        run: |
+          cd TrollSpeed
+          if [ -f "build.sh" ]; then
+            echo "🚀 Building .tipa package..."
+            ./build.sh ${{ env.VERSION }}
+            echo "✅ build.sh completed."
+          else
+            echo "⚠️ No build.sh found, skipping .tipa build."
+          fi
+
+      - name: Package .deb (if control exists)
+        run: |
+          cd TrollSpeed
+          if [ -d "layout/DEBIAN" ]; then
+            mkdir -p packages
+            dpkg-deb -b layout packages/TrollSpeed_${{ env.VERSION }}_arm64.deb
+            echo "✅ Debian package created."
+          else
+            echo "⚠️ No DEBIAN layout found, skipping .deb package."
+          fi
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TrollSpeed.tipa
-          path: ${{ github.workspace }}/TrollSpeed/packages/${{ env.RENAMED_FILE }}
+          name: TrollSpeed_Packages
+          path: |
+            ${{ github.workspace }}/TrollSpeed/packages/*.tipa
+            ${{ github.workspace }}/TrollSpeed/packages/*.deb
 
       - name: Upload release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: "Build time: ${{ github.run_id }}"
+          body: "Build completed at ${{ github.run_id }}"
           generate_release_notes: true
           files: |
-            ${{ github.workspace }}/TrollSpeed/packages/${{ env.RENAMED_FILE }}
+            ${{ github.workspace }}/TrollSpeed/packages/*.tipa
+            ${{ github.workspace }}/TrollSpeed/packages/*.deb
