@@ -67,6 +67,16 @@ jobs:
             echo "⚠️ build.sh not found."
           fi
 
+      - name: 🧾 Fix DEBIAN script permissions
+        run: |
+          cd Trollpol
+          if [ -d "layout/DEBIAN" ]; then
+            chmod 755 layout/DEBIAN/* || true
+            echo "✅ Fixed DEBIAN script permissions"
+          else
+            echo "⚠️ No DEBIAN folder found, skipping permission fix."
+          fi
+
       - name: 📦 Package .deb (if DEBIAN exists)
         run: |
           cd Trollpol
