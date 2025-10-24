@@ -1,4 +1,4 @@
-name: Build Trollpol
+name: Build Trollpol (.tipa)
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   THEOS: ''
@@ -27,7 +28,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE=1 brew install dpkg ldid make libplist openssl@3
           echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Checkout XXTouchNG/theos
+      - name: Checkout XXTouchNG/theos (with Swift toolchain)
         uses: actions/checkout@v4
         with:
           repository: XXTouchNG/theos
@@ -40,7 +41,7 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/theos/sdks
           echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
 
-      - name: Restore additional SDKs
+      - name: Restore SDKs cache
         id: cached-sdks-restore
         uses: actions/cache/restore@v4
         with:
@@ -56,14 +57,14 @@ jobs:
           path: ${{ env.THEOS }}/sdks
 
       - if: ${{ steps.cached-sdks-restore.outputs.cache-hit != 'true' }}
-        name: Save SDKs
+        name: Save SDKs cache
         id: cached-sdks-save
         uses: actions/cache/save@v4
         with:
           path: ${{ env.THEOS }}/sdks
           key: ${{ steps.cached-sdks-restore.outputs.cache-primary-key }}
 
-      - name: Checkout Trollpol
+      - name: Checkout Trollpol project
         uses: actions/checkout@v4
         with:
           repository: shshsjsisjsj-glitch/Trollpol
@@ -83,7 +84,15 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           make clean || true
+          echo "🏗️ Building Trollpol (PCH disabled workaround)..."
+
+          # تعطيل خطوة precompiled header لتفادي الخطأ
           export SWIFT_DISABLE_PCH=1
+          export THEOS_SWIFT_USE_SWIFTTOOLCHAIN=1
+          export THEOS_SWIFT_COMPILER=$THEOS/toolchain/swift/usr/bin/swiftc
+          export THEOS_SWIFT_STDLIB_PATH=$THEOS/toolchain/swift/usr/lib/swift
+          sed -i '' 's|generate-pch|true|' $THEOS/makefiles/targets/iphone/application.mk || true
+
           make package FINALPACKAGE=1
           echo "✅ Trollpol build completed!"
 
