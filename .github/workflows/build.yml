@@ -28,7 +28,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE=1 brew install dpkg ldid make libplist openssl@3
           echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Checkout XXTouchNG/theos (with Swift toolchain)
+      - name: Checkout XXTouchNG/theos (includes Swift toolchain)
         uses: actions/checkout@v4
         with:
           repository: XXTouchNG/theos
@@ -72,29 +72,22 @@ jobs:
           path: Trollpol
           submodules: recursive
 
-      - name: Setup build environment
+      - name: Patch Theos to disable PCH generation
         run: |
-          echo "🧩 SDKs detected:"
-          find $THEOS/sdks -name "*.sdk" -maxdepth 1 -print
-          sT=$(TZ=UTC date +'%S')
-          echo "msT=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
-          echo "logT=$(TZ=UTC date +'%Y-%m-%d %H:%M'):${sT}" >> $GITHUB_ENV
+          echo "🩹 Patching Theos makefiles to disable generate-pch..."
+          # نحذف أو نعلّق أي استدعاء لـ generate-pch
+          find $THEOS/makefiles -type f -name "*.mk" -exec sed -i '' 's|generate-pch|true|g' {} +
+          echo "✅ PCH disabled in makefiles."
 
       - name: Build Trollpol (.tipa)
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           make clean || true
-          echo "🏗️ Building Trollpol (PCH disabled workaround)..."
-
-          # تعطيل خطوة precompiled header لتفادي الخطأ
-          export SWIFT_DISABLE_PCH=1
+          echo "🏗️ Building Trollpol..."
           export THEOS_SWIFT_USE_SWIFTTOOLCHAIN=1
-          export THEOS_SWIFT_COMPILER=$THEOS/toolchain/swift/usr/bin/swiftc
-          export THEOS_SWIFT_STDLIB_PATH=$THEOS/toolchain/swift/usr/lib/swift
-          sed -i '' 's|generate-pch|true|' $THEOS/makefiles/targets/iphone/application.mk || true
-
+          export SWIFT_DISABLE_PCH=1
           make package FINALPACKAGE=1
-          echo "✅ Trollpol build completed!"
+          echo "✅ Trollpol build completed successfully!"
 
       - name: Upload Trollpol artifact
         uses: actions/upload-artifact@v4
