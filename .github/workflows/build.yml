@@ -13,7 +13,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Install dependencies and Theos
       run: |
         echo "🔧 Installing dependencies..."
         brew install make dpkg ldid
@@ -21,11 +21,15 @@ jobs:
         echo "📦 Cloning Theos..."
         git clone --recursive https://github.com/theos/theos $HOME/theos
 
-        echo "🧹 Cleaning old SDKs (if exist)..."
+        echo "🧹 Cleaning old SDKs..."
         rm -rf $HOME/theos/sdks
 
         echo "📥 Downloading iOS SDKs..."
         git clone https://github.com/theos/sdks $HOME/theos/sdks
+
+        echo "📥 Downloading Swift toolchain..."
+        mkdir -p $HOME/theos/toolchain
+        git clone https://github.com/kabiroberai/swift-toolchain-ios.git $HOME/theos/toolchain/swift
 
         echo "⚙️ Setting environment..."
         echo "THEOS=$HOME/theos" >> $GITHUB_ENV
