@@ -1,4 +1,4 @@
-name: Build Trollpol (.tipa)
+name: Build Trollpol
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch:
 
 env:
   THEOS: ''
@@ -28,7 +27,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE=1 brew install dpkg ldid make libplist openssl@3
           echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Checkout XXTouchNG/theos (includes Swift toolchain)
+      - name: Checkout XXTouchNG/theos
         uses: actions/checkout@v4
         with:
           repository: XXTouchNG/theos
@@ -41,7 +40,7 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/theos/sdks
           echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
 
-      - name: Restore SDKs cache
+      - name: Restore additional SDKs
         id: cached-sdks-restore
         uses: actions/cache/restore@v4
         with:
@@ -57,14 +56,14 @@ jobs:
           path: ${{ env.THEOS }}/sdks
 
       - if: ${{ steps.cached-sdks-restore.outputs.cache-hit != 'true' }}
-        name: Save SDKs cache
+        name: Save SDKs
         id: cached-sdks-save
         uses: actions/cache/save@v4
         with:
           path: ${{ env.THEOS }}/sdks
           key: ${{ steps.cached-sdks-restore.outputs.cache-primary-key }}
 
-      - name: Checkout Trollpol project
+      - name: Checkout Trollpol
         uses: actions/checkout@v4
         with:
           repository: shshsjsisjsj-glitch/Trollpol
@@ -72,35 +71,53 @@ jobs:
           path: Trollpol
           submodules: recursive
 
-      - name: Patch Theos to disable PCH generation
+      - name: Setup build environment
         run: |
-          echo "🩹 Patching Theos makefiles to disable generate-pch..."
-          # نحذف أو نعلّق أي استدعاء لـ generate-pch
-          find $THEOS/makefiles -type f -name "*.mk" -exec sed -i '' 's|generate-pch|true|g' {} +
-          echo "✅ PCH disabled in makefiles."
+          echo "Available SDKs: $(find $THEOS/sdks -name "*.sdk" -maxdepth 1 -print)"
+          sT=$(TZ=UTC-8 date +'%S')
+          echo "msT=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
+          echo "logT=$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" >> $GITHUB_ENV
+          echo $msT
+          echo $logT
 
-      - name: Build Trollpol (.tipa)
+      - name: Patch Theos to skip generate-pch
+        run: |
+          echo "🩹 Removing generate-pch references from Theos..."
+          find $THEOS/makefiles -type f -name "*.mk" -exec sed -i '' 's|generate-pch|true|g' {} +
+          echo "✅ PCH disabled."
+
+      - name: Make Trollpol .tipa
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           make clean || true
           echo "🏗️ Building Trollpol..."
-          export THEOS_SWIFT_USE_SWIFTTOOLCHAIN=1
-          export SWIFT_DISABLE_PCH=1
           make package FINALPACKAGE=1
-          echo "✅ Trollpol build completed successfully!"
+          echo "✅ Trollpol build completed."
 
-      - name: Upload Trollpol artifact
+      - name: Collect symbols
+        run: |
+          cd $GITHUB_WORKSPACE/Trollpol
+          mkdir -p build
+          find .theos/obj -name "*.dSYM" -print | zip -r build/Trollpol_symbols.zip -@ || true
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Trollpol.tipa
           path: ${{ github.workspace }}/Trollpol/packages/*.tipa
+
+      - name: Upload symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trollpol_symbols
+          path: ${{ github.workspace }}/Trollpol/build/Trollpol_symbols.zip
 
       - name: Upload release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: Build time ${{ env.logT }}
+          body: build time ${{ env.logT }}
           generate_release_notes: true
           files: |
             ${{ github.workspace }}/Trollpol/packages/*.tipa
