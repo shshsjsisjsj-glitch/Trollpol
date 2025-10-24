@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   THEOS: ''
@@ -40,7 +41,7 @@ jobs:
           rm -rf $GITHUB_WORKSPACE/theos/sdks
           echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
 
-      - name: Restore additional SDKs
+      - name: Restore SDKs cache
         id: cached-sdks-restore
         uses: actions/cache/restore@v4
         with:
@@ -56,7 +57,7 @@ jobs:
           path: ${{ env.THEOS }}/sdks
 
       - if: ${{ steps.cached-sdks-restore.outputs.cache-hit != 'true' }}
-        name: Save SDKs
+        name: Save SDKs cache
         id: cached-sdks-save
         uses: actions/cache/save@v4
         with:
@@ -71,28 +72,26 @@ jobs:
           path: Trollpol
           submodules: recursive
 
-      - name: Setup build environment
+      - name: Patch Theos to fully disable generate-pch
         run: |
-          echo "Available SDKs: $(find $THEOS/sdks -name "*.sdk" -maxdepth 1 -print)"
-          sT=$(TZ=UTC-8 date +'%S')
-          echo "msT=$(date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
-          echo "logT=$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" >> $GITHUB_ENV
-          echo $msT
-          echo $logT
-
-      - name: Patch Theos to skip generate-pch
-        run: |
-          echo "🩹 Removing generate-pch references from Theos..."
-          find $THEOS/makefiles -type f -name "*.mk" -exec sed -i '' 's|generate-pch|true|g' {} +
-          echo "✅ PCH disabled."
+          echo "🩹 Removing generate-pch from Theos makefiles..."
+          TARGET_FILE="$THEOS/makefiles/targets/iphone/internal-swift.mk"
+          if [ -f "$TARGET_FILE" ]; then
+            echo "Found internal-swift.mk → patching..."
+            sed -i '' '/generate-pch/d' "$TARGET_FILE"
+            echo "# Patched by CI to disable PCH" >> "$TARGET_FILE"
+          fi
+          echo "✅ PCH fully disabled."
 
       - name: Make Trollpol .tipa
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           make clean || true
           echo "🏗️ Building Trollpol..."
+          export SWIFT_DISABLE_PCH=1
+          export THEOS_SWIFT_USE_SWIFTTOOLCHAIN=1
           make package FINALPACKAGE=1
-          echo "✅ Trollpol build completed."
+          echo "✅ Trollpol build completed successfully!"
 
       - name: Collect symbols
         run: |
@@ -117,7 +116,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: build time ${{ env.logT }}
+          body: Build time ${{ env.logT }}
           generate_release_notes: true
           files: |
             ${{ github.workspace }}/Trollpol/packages/*.tipa
