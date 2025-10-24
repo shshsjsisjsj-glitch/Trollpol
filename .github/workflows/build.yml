@@ -1,4 +1,4 @@
-name: Build Trollpol
+name: Build Trollpol (.tipa)
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE=1 brew install dpkg ldid make libplist openssl@3
           echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Checkout XXTouchNG/theos
+      - name: Checkout XXTouchNG/theos (with Swift toolchain)
         uses: actions/checkout@v4
         with:
           repository: XXTouchNG/theos
@@ -72,18 +72,14 @@ jobs:
           path: Trollpol
           submodules: recursive
 
-      - name: Patch Theos to fully disable generate-pch
+      - name: Patch all makefiles to remove generate-pch
         run: |
-          echo "🩹 Removing generate-pch from Theos makefiles..."
-          TARGET_FILE="$THEOS/makefiles/targets/iphone/internal-swift.mk"
-          if [ -f "$TARGET_FILE" ]; then
-            echo "Found internal-swift.mk → patching..."
-            sed -i '' '/generate-pch/d' "$TARGET_FILE"
-            echo "# Patched by CI to disable PCH" >> "$TARGET_FILE"
-          fi
-          echo "✅ PCH fully disabled."
+          echo "🩹 Removing generate-pch from Theos and project..."
+          find $THEOS -type f -name "*.mk" -exec sed -i '' '/generate-pch/d' {} +
+          find $GITHUB_WORKSPACE/Trollpol -type f -name "*.mk" -exec sed -i '' '/generate-pch/d' {} +
+          echo "✅ All generate-pch references removed."
 
-      - name: Make Trollpol .tipa
+      - name: Build Trollpol (.tipa)
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           make clean || true
@@ -93,17 +89,28 @@ jobs:
           make package FINALPACKAGE=1
           echo "✅ Trollpol build completed successfully!"
 
+      - name: Rename build artifact with version + build number
+        run: |
+          cd $GITHUB_WORKSPACE/Trollpol/packages
+          FILE=$(ls *.tipa | head -n 1)
+          VERSION=$(git describe --tags --always || echo "v1.0.0")
+          BUILDNUM=${{ github.run_number }}
+          NEWNAME="Trollpol_${VERSION}_build${BUILDNUM}.tipa"
+          mv "$FILE" "$NEWNAME"
+          echo "RENAMED_FILE=$NEWNAME" >> $GITHUB_ENV
+          echo "📦 Renamed artifact to $NEWNAME"
+
       - name: Collect symbols
         run: |
           cd $GITHUB_WORKSPACE/Trollpol
           mkdir -p build
           find .theos/obj -name "*.dSYM" -print | zip -r build/Trollpol_symbols.zip -@ || true
 
-      - name: Upload artifacts
+      - name: Upload .tipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Trollpol.tipa
-          path: ${{ github.workspace }}/Trollpol/packages/*.tipa
+          name: ${{ env.RENAMED_FILE }}
+          path: ${{ github.workspace }}/Trollpol/packages/${{ env.RENAMED_FILE }}
 
       - name: Upload symbols
         uses: actions/upload-artifact@v4
@@ -116,7 +123,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: Build time ${{ env.logT }}
+          body: "Build time: ${{ github.run_id }}"
           generate_release_notes: true
           files: |
-            ${{ github.workspace }}/Trollpol/packages/*.tipa
+            ${{ github.workspace }}/Trollpol/packages/${{ env.RENAMED_FILE }}
