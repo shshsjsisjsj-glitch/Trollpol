@@ -1,0 +1,32 @@
+name: Build TrollSpeed (.tipa)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew install make dpkg ldid
+        git clone --recursive https://github.com/theos/theos $HOME/theos
+        git clone https://github.com/theos/sdks $HOME/theos/sdks
+        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+        echo "PATH=$HOME/theos/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Build TrollSpeed
+      run: |
+        make package FINALPACKAGE=1
+
+    - name: Upload .tipa
+      uses: actions/upload-artifact@v4
+      with:
+        name: TrollSpeed
+        path: packages/*.tipa
