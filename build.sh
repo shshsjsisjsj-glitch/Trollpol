@@ -1,33 +1,50 @@
 #!/bin/sh
 
-# This script is used to build the TrollSpeed app and create a tipa file with Xcode.
+# TrollSpeed TrollStore build script (fixed)
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <version>"
     exit 1
 fi
 
 VERSION=$1
-
-# Strip leading "v" from version if present
 VERSION=${VERSION#v}
 
-# Build using Xcode
-xcodebuild clean build archive \
--scheme TrollSpeed \
--project 暗区Troll.xcodeproj \
--sdk iphoneos \
--destination 'generic/platform=iOS' \
--archivePath TrollSpeed \
-CODE_SIGNING_ALLOWED=NO | xcpretty
+APP_NAME="TrollSpeed"
+ENT_PATH="supports/entitlements.plist"
 
-cp supports/entitlements.plist TrollSpeed.xcarchive/Products
-cd TrollSpeed.xcarchive/Products/Applications
-codesign --remove-signature TrollSpeed.app
-cd -
-cd TrollSpeed.xcarchive/Products
+echo "🚀 Building ${APP_NAME} for TrollStore (v${VERSION})"
+
+# Clean + build using xcodebuild
+xcodebuild clean build archive \
+  -scheme "${APP_NAME}" \
+  -project "暗区Troll.xcodeproj" \
+  -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
+  -archivePath "${APP_NAME}" \
+  CODE_SIGNING_ALLOWED=NO | xcpretty
+
+# Copy entitlements into archive
+cp "${ENT_PATH}" "${APP_NAME}.xcarchive/Products/"
+
+# Go inside archive output
+cd "${APP_NAME}.xcarchive/Products" || exit 1
+
+# Rename directory to Payload
 mv Applications Payload
-/Users/zaizai/Desktop/ldid Sentitlements.plist Payload/TrollSpeed.app
-zip -qr TrollSpeed.tipa Payload
-cd -
-mkdir -p packages
-mv TrollSpeed.xcarchive/Products/TrollSpeed.tipa packages/TrollSpeed+AppIntents16_$VERSION.tipa
+cd Payload/${APP_NAME}.app || exit 1
+
+# Add TrollStore persistence file (needed!)
+touch _TrollStorePersistenceHelper
+
+# Re-sign with ldid + TrollStore entitlements
+echo "🔑 Signing with TrollStore entitlements..."
+ldid -S"../../entitlements.plist" "${APP_NAME}"
+
+cd ../../
+
+# Compress into .tipa
+zip -qr "${APP_NAME}.tipa" Payload
+mkdir -p ../../packages
+mv "${APP_NAME}.tipa" "../../packages/${APP_NAME}_${VERSION}.tipa"
+
+echo "✅ ${APP_NAME}_${VERSION}.tipa ready in /packages"
