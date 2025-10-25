@@ -100,7 +100,7 @@ static AVAudioSession *audioSession;
 -(void)getbaseDict
 {
     @autoreleasepool {
-        GWorld = DUSWRGHGEWF<long>(baseAdd+0x265AA48);
+        GWorld = DUSWRGHGEWF<long>(baseAdd+ 0x11265AA48);
         auto ULevel = DUSWRGHGEWF<long>(GWorld + 0x90);
         ActorArray = DUSWRGHGEWF<long>(ULevel + 0xA0);
         ActorCount = DUSWRGHGEWF<int>(ULevel + 0xA8);
@@ -247,7 +247,7 @@ static AVAudioSession *audioSession;
     dispatch_sync(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         if (物资开关) {
             NSMutableArray * 物资数组= @[].mutableCopy;
-            long UName = DUSWRGHGEWF<long>(baseAdd + 0x233a580);
+            long UName = DUSWRGHGEWF<long>(baseAdd + 0x11233A580);
             
             for (int i = 0; i < ActorCount; i++) {
                 long Object = DUSWRGHGEWF<long>(ActorArray + i*8);
