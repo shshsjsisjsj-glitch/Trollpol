@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# TrollSpeed TrollStore build script (fixed)
+# TrollSpeed TrollStore build (fixed for GitHub Actions)
+# By ChatGPT 2025
+
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <version>"
     exit 1
@@ -14,37 +16,42 @@ ENT_PATH="supports/entitlements.plist"
 
 echo "🚀 Building ${APP_NAME} for TrollStore (v${VERSION})"
 
-# Clean + build using xcodebuild
+# 1️⃣ Clean + build project
 xcodebuild clean build archive \
-  -scheme "${APP_NAME}" \
-  -project "暗区Troll.xcodeproj" \
-  -sdk iphoneos \
-  -destination 'generic/platform=iOS' \
-  -archivePath "${APP_NAME}" \
-  CODE_SIGNING_ALLOWED=NO | xcpretty
+-scheme "${APP_NAME}" \
+-project "暗区Troll.xcodeproj" \
+-sdk iphoneos \
+-destination 'generic/platform=iOS' \
+-archivePath "${APP_NAME}" \
+CODE_SIGNING_ALLOWED=NO | xcpretty
 
-# Copy entitlements into archive
-cp "${ENT_PATH}" "${APP_NAME}.xcarchive/Products/"
+# 2️⃣ Copy entitlements
+cp "${ENT_PATH}" "${APP_NAME}.xcarchive/Products"
 
-# Go inside archive output
+# 3️⃣ Enter archive output
 cd "${APP_NAME}.xcarchive/Products" || exit 1
 
-# Rename directory to Payload
+# 4️⃣ Rename Applications → Payload
 mv Applications Payload
+
+# 5️⃣ Move inside the .app folder
 cd Payload/${APP_NAME}.app || exit 1
 
-# Add TrollStore persistence file (needed!)
+# 6️⃣ Add TrollStore persistence helper (important)
 touch _TrollStorePersistenceHelper
 
-# Re-sign with ldid + TrollStore entitlements
-echo "🔑 Signing with TrollStore entitlements..."
+# 7️⃣ Re-sign app with TrollStore entitlements
+echo "🔑 Signing app with TrollStore entitlements..."
 ldid -S"../../entitlements.plist" "${APP_NAME}"
 
+# 8️⃣ Back to archive root
 cd ../../
 
-# Compress into .tipa
+# 9️⃣ Package into .tipa
 zip -qr "${APP_NAME}.tipa" Payload
-mkdir -p ../../packages
-mv "${APP_NAME}.tipa" "../../packages/${APP_NAME}_${VERSION}.tipa"
 
-echo "✅ ${APP_NAME}_${VERSION}.tipa ready in /packages"
+# 🔟 Move to /packages directory
+mkdir -p ../../packages
+mv "${APP_NAME}.tipa" "../../packages/${APP_NAME}+TrollStore_${VERSION}.tipa"
+
+echo "✅ Build completed: packages/${APP_NAME}+TrollStore_${VERSION}.tipa"
