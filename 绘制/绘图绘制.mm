@@ -156,7 +156,7 @@ static void Cosmk() {
       totalEnemies = 0;
       AItotalEnemies= 0;
       
-      long GWorld = DuQu<long>(Cosmksence + 0x111CF05F8);
+      long GWorld = DuQu<long>(Cosmksence + 0x11265AA48);
       if (!IsValidAddress(GWorld)) return;
       
       auto NetDriver = DuQu<long>(GWorld + 0x30);
